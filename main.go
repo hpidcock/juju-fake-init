@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"sync"
 	"syscall"
 	"unsafe"
 
@@ -32,11 +31,14 @@ func run() (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer l.Close()
 	sshl, err := net.Listen("tcp", "127.0.0.1:4322")
 	if err != nil {
 		return 0, err
 	}
 	defer sshl.Close()
+	cancel := make(chan struct{})
+	defer close(cancel)
 
 	ssh.Handle(func(s ssh.Session) {
 		req, windowChannel, isPty := s.Pty()
@@ -124,33 +126,34 @@ func run() (int, error) {
 	})
 
 	go func() {
-		err = ssh.Serve(sshl, nil, ssh.PublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
-			return true
-		}))
+		err = ssh.Serve(sshl, nil)
+		select {
+		case _, _ = <-cancel:
+			return
+		default:
+		}
 		if err != nil {
 			log.Fatal(err)
 		}
 	}()
 
-	mut := sync.Mutex{}
+	ready := make(chan struct{})
 	cmd := ""
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		if r.Method != "POST" {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
 
-		mut.Lock()
-		defer mut.Unlock()
-
-		if cmd != "" {
+		select {
+		case _, _ = <-ready:
 			w.WriteHeader(http.StatusPreconditionFailed)
 			return
-		}
-
-		err := l.Close()
-		if err != nil {
-			log.Fatal(err)
+		default:
 		}
 
 		body, err := ioutil.ReadAll(r.Body)
@@ -159,15 +162,24 @@ func run() (int, error) {
 		}
 
 		cmd = string(body)
+		close(ready)
 		w.WriteHeader(http.StatusOK)
 	})
 
-	s := &http.Server{}
-	err = s.Serve(l)
-	mut.Lock()
-	if err != nil && cmd == "" {
-		return 0, err
-	}
+	go func() {
+		s := &http.Server{}
+		err := s.Serve(l)
+		select {
+		case _, _ = <-cancel:
+			return
+		default:
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	_, _ = <-ready
 
 	args, err := shellquote.Split(cmd)
 	if err != nil {
@@ -189,11 +201,15 @@ func run() (int, error) {
 	signal.Notify(sc)
 	go func() {
 		for {
-			sig, ok := <-sc
-			if !ok {
+			select {
+			case _, _ = <-cancel:
 				return
+			case sig, ok := <-sc:
+				if !ok {
+					return
+				}
+				c.Process.Signal(sig)
 			}
-			c.Process.Signal(sig)
 		}
 	}()
 
