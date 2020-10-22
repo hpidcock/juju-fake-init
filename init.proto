@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+option go_package = "github.com/hpidcock/juju-fake-init;main";
+
+message StartRequest {
+    string command = 1;
+    repeated string args = 2;
+    repeated string env = 3;
+}
+
+message StartResponse {}
+
+enum ExecRequestMessageType {
+    EXEC_REQ_UNKNOWN = 0;
+    EXEC_REQ_EXEC = 1;
+    EXEC_REQ_STDIN = 2;
+    EXEC_REQ_SIGNAL = 3;
+}
+
+message ExecRequest {
+    ExecRequestMessageType type = 1;
+
+    // EXEC_REQ_EXEC
+    string command = 1000;
+    repeated string args = 1001;
+    repeated string env = 1002;
+
+    // EXEC_REQ_STDIN
+    bytes stdin = 2000;
+
+    // EXEC_REQ_SIGNAL
+    int32 signal = 3000;
+}
+
+
+enum ExecResponseMessageType {
+    EXEC_RES_UNKNOWN = 0;
+    EXEC_RES_EXIT = 1;
+    EXEC_RES_STDOUT = 2;
+    EXEC_RES_STDERR = 3;
+}
+
+message ExecResponse {
+    ExecResponseMessageType type = 1;
+
+    // EXEC_RES_EXIT
+    int32 exit_code = 1000;
+
+    // EXEC_RES_STDOUT
+    bytes stdout = 2000;
+
+    // EXEC_RES_STDERR
+    bytes stderr = 3000;
+}
+
+message PingRequest {}
+message PingResponse {}
+message SignalRequest {
+    int32 signal = 1;
+}
+message SignalResponse {}
+
+service FakeInit {
+    rpc Start(StartRequest) returns (StartResponse) {}
+    rpc Exec(stream ExecRequest) returns (stream ExecResponse) {}
+    rpc Ping(PingRequest) returns (PingResponse) {}
+    rpc Signal(SignalRequest) returns (SignalRequest) {}
+}
