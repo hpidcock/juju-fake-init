@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	context "context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -36,6 +37,8 @@ func main() {
 		f = cmdStart
 	case "signal":
 		f = cmdSignal
+	case "status":
+		f = cmdStatus
 	default:
 		f = func() (int, error) {
 			fmt.Fprintf(os.Stderr, "usage: %s [listen | exec | start | signal]\n", os.Args[0])
@@ -442,6 +445,43 @@ func cmdSignal() (int, error) {
 	}
 
 	return 0, nil
+}
+
+func cmdStatus() (int, error) {
+	addr := ""
+	fs := flag.NewFlagSet(fmt.Sprintf("%s start", os.Args[0]), flag.ExitOnError)
+	fs.StringVar(&addr, "socket", "", "path to sock file to connect to")
+	fs.Parse(os.Args[2:])
+
+	if addr == "" {
+		return 0, fmt.Errorf("missing --socket argument")
+	}
+
+	conn, err := connect(addr)
+	if err != nil {
+		return 0, err
+	}
+
+	client := NewFakeInitClient(conn)
+	s, err := client.Status(context.Background(), &StatusRequest{})
+	if err != nil {
+		return 0, err
+	}
+
+	out := struct {
+		Status string `json:"status"`
+		Pid    int    `json:"pid"`
+	}{
+		Pid: int(s.Pid),
+	}
+	switch s.Status {
+	case Status_WAITING:
+		out.Status = "waiting"
+	case Status_RUNNING:
+		out.Status = "running"
+	}
+
+	return 0, json.NewEncoder(os.Stdout).Encode(out)
 }
 
 type envVars []string

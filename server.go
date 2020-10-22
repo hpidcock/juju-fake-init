@@ -254,3 +254,19 @@ func (s *Server) Signal(ctx context.Context, req *SignalRequest) (*SignalRequest
 	}
 	return &SignalRequest{}, nil
 }
+
+func (s *Server) Status(ctx context.Context, req *StatusRequest) (*StatusResponse, error) {
+	exitWG.Add(1)
+	defer exitWG.Done()
+	entrypointMutex.Lock()
+	defer entrypointMutex.Unlock()
+	if entrypointProcess != nil {
+		return &StatusResponse{
+			Status: Status_RUNNING,
+			Pid:    int32(entrypointProcess.Pid),
+		}, nil
+	}
+	return &StatusResponse{
+		Status: Status_WAITING,
+	}, nil
+}

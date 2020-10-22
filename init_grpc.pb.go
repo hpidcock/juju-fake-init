@@ -21,6 +21,7 @@ type FakeInitClient interface {
 	Exec(ctx context.Context, opts ...grpc.CallOption) (FakeInit_ExecClient, error)
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 	Signal(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalRequest, error)
+	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 }
 
 type fakeInitClient struct {
@@ -89,6 +90,15 @@ func (c *fakeInitClient) Signal(ctx context.Context, in *SignalRequest, opts ...
 	return out, nil
 }
 
+func (c *fakeInitClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, "/FakeInit/Status", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FakeInitServer is the server API for FakeInit service.
 // All implementations must embed UnimplementedFakeInitServer
 // for forward compatibility
@@ -97,6 +107,7 @@ type FakeInitServer interface {
 	Exec(FakeInit_ExecServer) error
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	Signal(context.Context, *SignalRequest) (*SignalRequest, error)
+	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	mustEmbedUnimplementedFakeInitServer()
 }
 
@@ -115,6 +126,9 @@ func (UnimplementedFakeInitServer) Ping(context.Context, *PingRequest) (*PingRes
 }
 func (UnimplementedFakeInitServer) Signal(context.Context, *SignalRequest) (*SignalRequest, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Signal not implemented")
+}
+func (UnimplementedFakeInitServer) Status(context.Context, *StatusRequest) (*StatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
 func (UnimplementedFakeInitServer) mustEmbedUnimplementedFakeInitServer() {}
 
@@ -209,6 +223,24 @@ func _FakeInit_Signal_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FakeInit_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FakeInitServer).Status(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/FakeInit/Status",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FakeInitServer).Status(ctx, req.(*StatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _FakeInit_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "FakeInit",
 	HandlerType: (*FakeInitServer)(nil),
@@ -224,6 +256,10 @@ var _FakeInit_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Signal",
 			Handler:    _FakeInit_Signal_Handler,
+		},
+		{
+			MethodName: "Status",
+			Handler:    _FakeInit_Status_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

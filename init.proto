@@ -55,14 +55,26 @@ message ExecResponse {
 
 message PingRequest {}
 message PingResponse {}
+
 message SignalRequest {
     int32 signal = 1;
 }
 message SignalResponse {}
+
+enum Status {
+    WAITING = 0;
+    RUNNING = 1;
+}
+message StatusRequest {}
+message StatusResponse {
+    Status status = 1;
+    int32 pid = 2;
+}
 
 service FakeInit {
     rpc Start(StartRequest) returns (StartResponse) {}
     rpc Exec(stream ExecRequest) returns (stream ExecResponse) {}
     rpc Ping(PingRequest) returns (PingResponse) {}
     rpc Signal(SignalRequest) returns (SignalRequest) {}
+    rpc Status(StatusRequest) returns (StatusResponse) {}
 }
