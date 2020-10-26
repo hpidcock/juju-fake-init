@@ -54,9 +54,37 @@ func main() {
 
 func cmdListen() (int, error) {
 	addr := ""
+	appendEnv := envVars{}
 	fs := flag.NewFlagSet(fmt.Sprintf("%s listen", os.Args[0]), flag.ExitOnError)
 	fs.StringVar(&addr, "socket", "/var/run/container/juju-fake-init.sock", "path to sock file to listen on")
+	fs.Var(&appendEnv, "append-env", "--append-env K=V [--env=K=$V:V...]")
 	fs.Parse(os.Args[2:])
+
+	// Append environment with passed in values.
+	for _, e := range appendEnv {
+		kv := strings.SplitN(e, "=", 2)
+		k, v := "", ""
+		switch len(kv) {
+		case 1:
+			k = kv[0]
+		case 2:
+			k = kv[0]
+			v = kv[1]
+		default:
+			return 0, fmt.Errorf("invalid K=V pair for --append-env")
+		}
+		if v == "" {
+			err := os.Unsetenv(k)
+			if err != nil {
+				return 0, err
+			}
+		} else {
+			err := os.Setenv(k, os.ExpandEnv(v))
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
 
 	if _, err := os.Stat(addr); os.IsNotExist(err) {
 		// Do nothing
